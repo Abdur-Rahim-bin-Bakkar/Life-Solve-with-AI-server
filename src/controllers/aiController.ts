@@ -341,6 +341,7 @@ export async function deleteChatSession(req: AuthRequest, res: Response) {
     const session = await ChatSession.findOneAndDelete({
       _id: req.params.id,
       userId: req.user!.id,
+      sessionType: "chat",
     })
 
     if (!session) {
