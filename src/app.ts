@@ -7,8 +7,12 @@ import notificationRoutes from "./routes/notifications"
 
 const app = express()
 
+const allowedOrigins = (process.env.CORS_ORIGIN || "http://localhost:3000")
+  .split(",")
+  .map(s => s.trim())
+
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || "http://localhost:3000",
+  origin: allowedOrigins,
   credentials: true,
 }))
 
