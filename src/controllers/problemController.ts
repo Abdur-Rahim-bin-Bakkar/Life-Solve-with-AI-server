@@ -51,7 +51,8 @@ export async function getProblems(_req: AuthRequest, res: Response) {
 
 export async function getProblemById(req: AuthRequest, res: Response) {
   try {
-    const problem = await Problem.findById(req.params.id)
+    const id = typeof req.params.id === "string" ? req.params.id : req.params.id[0]
+    const problem = await Problem.findById(id)
     if (!problem) {
       return res.status(404).json({ error: "Problem not found" })
     }
@@ -64,7 +65,8 @@ export async function getProblemById(req: AuthRequest, res: Response) {
 
 export async function deleteProblem(req: AuthRequest, res: Response) {
   try {
-    const problem = await Problem.findById(req.params.id)
+    const id = typeof req.params.id === "string" ? req.params.id : req.params.id[0]
+    const problem = await Problem.findById(id)
     if (!problem) {
       return res.status(404).json({ error: "Problem not found" })
     }
@@ -73,7 +75,7 @@ export async function deleteProblem(req: AuthRequest, res: Response) {
       return res.status(403).json({ error: "Not authorized to delete this problem" })
     }
 
-    await Problem.findByIdAndDelete(req.params.id)
+    await Problem.findByIdAndDelete(id)
     return res.json({ message: "Problem deleted successfully" })
   } catch (error) {
     console.error("Delete problem error:", error)

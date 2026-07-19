@@ -11,6 +11,11 @@ export interface IProblem extends Document {
   userName: string
   userImage?: string
   status: "open" | "resolved"
+  reactions: {
+    likes: string[]
+    loves: string[]
+    sads: string[]
+  }
   createdAt: Date
   updatedAt: Date
 }
@@ -27,6 +32,14 @@ const ProblemSchema = new Schema<IProblem>(
     userName: { type: String, required: true },
     userImage: { type: String },
     status: { type: String, default: "open", enum: ["open", "resolved"] },
+    reactions: {
+      type: {
+        likes: [{ type: String }],
+        loves: [{ type: String }],
+        sads: [{ type: String }],
+      },
+      default: { likes: [], loves: [], sads: [] },
+    },
   },
   { timestamps: true, collection: "problem" }
 )
