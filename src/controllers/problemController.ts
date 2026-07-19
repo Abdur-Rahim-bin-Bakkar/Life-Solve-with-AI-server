@@ -36,11 +36,26 @@ export async function createProblem(req: AuthRequest, res: Response) {
   }
 }
 
-export async function getProblems(_req: AuthRequest, res: Response) {
+export async function getProblems(req: AuthRequest, res: Response) {
   try {
-    const problems = await Problem.find()
-      .sort({ createdAt: -1 })
-      .limit(50)
+    const { search, category, sort, limit: limitStr } = req.query
+
+    const filter: Record<string, unknown> = {}
+
+    if (category && category !== "All") {
+      filter.category = category
+    }
+
+    if (search && typeof search === "string" && search.trim()) {
+      filter.title = { $regex: search.trim(), $options: "i" }
+    }
+
+    const sortOrder = sort === "old" ? 1 : -1
+    const limit = Math.min(Math.abs(Number(limitStr) || 50), 100)
+
+    const problems = await Problem.find(filter)
+      .sort({ createdAt: sortOrder })
+      .limit(limit)
 
     return res.json({ problems })
   } catch (error) {
