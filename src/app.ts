@@ -1,4 +1,4 @@
-import express from "express"
+import express, { Request, Response, NextFunction } from "express"
 import cors from "cors"
 import problemRoutes from "./routes/problems"
 
@@ -15,6 +15,11 @@ app.use("/api/problems", problemRoutes)
 
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() })
+})
+
+app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
+  console.error("Unhandled error:", err)
+  res.status(500).json({ error: "Internal server error" })
 })
 
 export default app

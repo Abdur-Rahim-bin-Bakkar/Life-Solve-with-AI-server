@@ -34,8 +34,17 @@ export async function authenticate(req: AuthRequest, res: Response, next: NextFu
       return
     }
 
+    // Better Auth might store userId as string (UUID) or as ObjectId string
+    // Try both to be safe
+    let userQuery: Record<string, unknown>
+    if (mongoose.Types.ObjectId.isValid(session.userId)) {
+      userQuery = { _id: new mongoose.Types.ObjectId(session.userId) }
+    } else {
+      userQuery = { _id: session.userId }
+    }
+
     const user = await db.collection("user").findOne(
-      { _id: new mongoose.Types.ObjectId(session.userId) },
+      userQuery,
       { projection: { password: 0 } }
     )
 
