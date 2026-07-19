@@ -1,5 +1,6 @@
 import { Response } from "express"
 import { Problem } from "../models/Problem"
+import { Comment } from "../models/Comment"
 import { AuthRequest } from "../types"
 
 export async function createProblem(req: AuthRequest, res: Response) {
@@ -107,5 +108,109 @@ export async function getUserProblems(req: AuthRequest, res: Response) {
   } catch (error) {
     console.error("Get user problems error:", error)
     return res.status(500).json({ error: "Failed to fetch user problems" })
+  }
+}
+
+export async function updateProblem(req: AuthRequest, res: Response) {
+  try {
+    const id = typeof req.params.id === "string" ? req.params.id : req.params.id[0]
+    const allowed = ["title", "shortDescription", "fullDescription", "category", "priority", "images", "status"]
+    const updates: Record<string, unknown> = {}
+
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) updates[key] = req.body[key]
+    }
+
+    if (updates.title !== undefined && !String(updates.title).trim()) {
+      return res.status(400).json({ error: "Title cannot be empty" })
+    }
+
+    const problem = await Problem.findById(id)
+    if (!problem) return res.status(404).json({ error: "Problem not found" })
+    if (problem.userId !== req.user!.id) return res.status(403).json({ error: "Not authorized" })
+
+    const updated = await Problem.findByIdAndUpdate(id, { $set: updates }, { new: true, runValidators: true })
+    return res.json({ problem: updated })
+  } catch (error) {
+    console.error("Update problem error:", error)
+    return res.status(500).json({ error: "Failed to update problem" })
+  }
+}
+
+export async function getUserStats(req: AuthRequest, res: Response) {
+  try {
+    const userId = req.user!.id
+    const posts = await Problem.find({ userId }).sort({ createdAt: -1 })
+
+    const postCount = posts.length
+    const solvedCount = posts.filter((p) => p.status === "resolved").length
+
+    const comments = await Comment.find({ userId })
+    const commentCount = comments.length
+
+    const dailyMap: Record<string, { posts: number; solved: number }> = {}
+    const now = new Date()
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now)
+      d.setDate(d.getDate() - i)
+      const key = d.toISOString().slice(0, 10)
+      dailyMap[key] = { posts: 0, solved: 0 }
+    }
+
+    for (const p of posts) {
+      const key = new Date(p.createdAt).toISOString().slice(0, 10)
+      if (dailyMap[key]) dailyMap[key].posts++
+      if (p.status === "resolved") {
+        const sk = new Date(p.updatedAt).toISOString().slice(0, 10)
+        if (dailyMap[sk]) dailyMap[sk].solved++
+      }
+    }
+
+    const daily = Object.entries(dailyMap).map(([date, val]) => ({ date, ...val }))
+
+    return res.json({ stats: { postCount, solvedCount, commentCount, daily } })
+  } catch (error) {
+    console.error("Get user stats error:", error)
+    return res.status(500).json({ error: "Failed to get stats" })
+  }
+}
+
+export async function getOverviewStats(_req: AuthRequest, res: Response) {
+  try {
+    const totalPosts = await Problem.countDocuments()
+    const solvedPosts = await Problem.countDocuments({ status: "resolved" })
+    const totalComments = await Comment.countDocuments()
+
+    const dailyMap: Record<string, { posts: number; solved: number; comments: number }> = {}
+    const now = new Date()
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now)
+      d.setDate(d.getDate() - i)
+      const key = d.toISOString().slice(0, 10)
+      dailyMap[key] = { posts: 0, solved: 0, comments: 0 }
+    }
+
+    const posts = await Problem.find({}, { createdAt: 1, updatedAt: 1, status: 1 })
+    for (const p of posts) {
+      const key = new Date(p.createdAt).toISOString().slice(0, 10)
+      if (dailyMap[key]) dailyMap[key].posts++
+      if (p.status === "resolved") {
+        const sk = new Date(p.updatedAt).toISOString().slice(0, 10)
+        if (dailyMap[sk]) dailyMap[sk].solved++
+      }
+    }
+
+    const allComments = await Comment.find({}, { createdAt: 1 })
+    for (const c of allComments) {
+      const key = new Date(c.createdAt).toISOString().slice(0, 10)
+      if (dailyMap[key]) dailyMap[key].comments++
+    }
+
+    const daily = Object.entries(dailyMap).map(([date, val]) => ({ date, ...val }))
+
+    return res.json({ stats: { totalPosts, solvedPosts, totalComments, daily } })
+  } catch (error) {
+    console.error("Get overview stats error:", error)
+    return res.status(500).json({ error: "Failed to get overview stats" })
   }
 }

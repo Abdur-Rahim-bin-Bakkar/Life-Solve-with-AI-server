@@ -5,6 +5,9 @@ import {
   getProblemById,
   deleteProblem,
   getUserProblems,
+  updateProblem,
+  getUserStats,
+  getOverviewStats,
 } from "../controllers/problemController"
 import { toggleReaction } from "../controllers/reactionController"
 import {
@@ -20,6 +23,9 @@ const router = Router()
 router.post("/", authenticate, createProblem)
 router.get("/", getProblems)
 router.get("/my", authenticate, getUserProblems)
+router.get("/stats/my", authenticate, getUserStats)
+router.get("/stats/overview", getOverviewStats)
+router.put("/:id", authenticate, updateProblem)
 router.delete("/:id", authenticate, deleteProblem)
 router.get("/:id", getProblemById)
 
