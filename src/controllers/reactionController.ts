@@ -1,6 +1,7 @@
 import { Response } from "express"
 import { Problem } from "../models/Problem"
 import { AuthRequest } from "../types"
+import { createNotification } from "../lib/createNotification"
 
 const reactionFields = ["likes", "loves", "sads"] as const
 type ReactionField = typeof reactionFields[number]
@@ -35,6 +36,16 @@ export async function toggleReaction(req: AuthRequest, res: Response) {
     }
 
     await problem.save()
+
+    if (!alreadyHasType && problem.userId !== userId) {
+      createNotification({
+        userId: problem.userId,
+        type: "new_reaction",
+        title: "New Reaction",
+        message: `${req.user!.name} ${type === "like" ? "liked" : type === "love" ? "loved" : "felt sad about"} your problem "${problem.title}"`,
+        referenceId: problem._id.toString(),
+      })
+    }
 
     return res.json({
       reactions: {

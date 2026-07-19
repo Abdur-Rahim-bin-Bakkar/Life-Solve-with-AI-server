@@ -1,9 +1,11 @@
 import { Response } from "express"
+import mongoose from "mongoose"
 import { Problem } from "../models/Problem"
 import { Comment } from "../models/Comment"
 import { Message } from "../models/Message"
 import { ChatSession } from "../models/ChatSession"
 import { AuthRequest } from "../types"
+import { createNotification } from "../lib/createNotification"
 
 export async function createProblem(req: AuthRequest, res: Response) {
   try {
@@ -30,6 +32,14 @@ export async function createProblem(req: AuthRequest, res: Response) {
       userId: req.user!.id,
       userName: req.user!.name,
       userImage: req.user!.image,
+    })
+
+    createNotification({
+      userId: req.user!.id,
+      type: "problem_created",
+      title: "Problem Posted",
+      message: `Your problem "${title.trim()}" was posted successfully`,
+      referenceId: problem._id.toString(),
     })
 
     return res.status(201).json({ message: "Problem created successfully", problem })
@@ -134,7 +144,21 @@ export async function updateProblem(req: AuthRequest, res: Response) {
     if (!problem) return res.status(404).json({ error: "Problem not found" })
     if (problem.userId !== req.user!.id) return res.status(403).json({ error: "Not authorized" })
 
+    const wasResolved = problem.status === "resolved"
+    const becomingResolved = updates.status === "resolved"
+
     const updated = await Problem.findByIdAndUpdate(id, { $set: updates }, { new: true, runValidators: true })
+
+    if (!wasResolved && becomingResolved && updated) {
+      createNotification({
+        userId: req.user!.id,
+        type: "problem_resolved",
+        title: "Problem Resolved",
+        message: `Your problem "${updated.title}" was marked as resolved`,
+        referenceId: updated._id.toString(),
+      })
+    }
+
     return res.json({ problem: updated })
   } catch (error) {
     console.error("Update problem error:", error)
@@ -182,11 +206,27 @@ export async function getUserStats(req: AuthRequest, res: Response) {
 
 export async function getOverviewStats(_req: AuthRequest, res: Response) {
   try {
+    const db = mongoose.connection.db
+    if (!db) { res.status(500).json({ error: "Database not connected" }); return }
+
     const totalPosts = await Problem.countDocuments()
     const solvedPosts = await Problem.countDocuments({ status: "resolved" })
     const totalComments = await Comment.countDocuments()
     const totalMessages = await Message.countDocuments()
     const totalAiChats = await ChatSession.countDocuments()
+
+    const totalUsers = await db.collection("user").countDocuments()
+
+    const aiResponsesResult = await ChatSession.aggregate([
+      { $unwind: "$messages" },
+      { $match: { "messages.role": "assistant" } },
+      { $count: "total" },
+    ])
+    const totalAiResponses = aiResponsesResult[0]?.total || 0
+
+    const communityRating = totalPosts > 0
+      ? parseFloat(((solvedPosts / totalPosts) * 5).toFixed(1))
+      : 5.0
 
     const dailyMap: Record<string, { posts: number; solved: number; comments: number; messages: number; aiChats: number }> = {}
     const now = new Date()
@@ -227,7 +267,7 @@ export async function getOverviewStats(_req: AuthRequest, res: Response) {
 
     const daily = Object.entries(dailyMap).map(([date, val]) => ({ date, ...val }))
 
-    return res.json({ stats: { totalPosts, solvedPosts, totalComments, totalMessages, totalAiChats, daily } })
+    return res.json({ stats: { totalPosts, solvedPosts, totalComments, totalMessages, totalAiChats, totalUsers, totalAiResponses, communityRating, daily } })
   } catch (error) {
     console.error("Get overview stats error:", error)
     return res.status(500).json({ error: "Failed to get overview stats" })

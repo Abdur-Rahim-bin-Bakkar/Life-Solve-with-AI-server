@@ -3,6 +3,7 @@ import mongoose from "mongoose"
 import { Comment } from "../models/Comment"
 import { Problem } from "../models/Problem"
 import { AuthRequest } from "../types"
+import { createNotification } from "../lib/createNotification"
 
 function getProblemId(req: AuthRequest): string {
   return typeof req.params.id === "string" ? req.params.id : req.params.id[0]
@@ -52,6 +53,16 @@ export async function createComment(req: AuthRequest, res: Response) {
       userImage: req.user!.image,
       content: content.trim(),
     })
+
+    if (problem.userId !== req.user!.id) {
+      createNotification({
+        userId: problem.userId,
+        type: "new_comment",
+        title: "New Comment",
+        message: `${req.user!.name} commented on your problem "${problem.title}"`,
+        referenceId: problemId,
+      })
+    }
 
     return res.status(201).json({ comment })
   } catch (error) {

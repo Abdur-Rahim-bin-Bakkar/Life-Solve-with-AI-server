@@ -2,6 +2,7 @@ import { Response } from "express"
 import mongoose from "mongoose"
 import { AuthRequest } from "../types"
 import { Conversation, Message } from "../models/Message"
+import { createNotification } from "../lib/createNotification"
 
 function toMongoId(id: string): any {
   if (mongoose.Types.ObjectId.isValid(id)) {
@@ -230,6 +231,14 @@ export async function sendMessage(req: AuthRequest, res: Response) {
         read: msgData.read,
         createdAt: msgData.createdAt,
       },
+    })
+
+    createNotification({
+      userId: receiverId,
+      type: "new_message",
+      title: "New Message",
+      message: `${currentUser.name} sent you a message`,
+      referenceId: conversationId,
     })
   } catch (error) {
     console.error("Send message error:", error)
