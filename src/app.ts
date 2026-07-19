@@ -1,6 +1,7 @@
 import express, { Request, Response, NextFunction } from "express"
 import cors from "cors"
 import problemRoutes from "./routes/problems"
+import aiRoutes from "./routes/ai"
 
 const app = express()
 
@@ -12,6 +13,7 @@ app.use(cors({
 app.use(express.json())
 
 app.use("/api/problems", problemRoutes)
+app.use("/api/ai", aiRoutes)
 
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() })
