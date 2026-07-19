@@ -39,7 +39,7 @@ export async function createProblem(req: AuthRequest, res: Response) {
 
 export async function getProblems(req: AuthRequest, res: Response) {
   try {
-    const { search, category, sort, limit: limitStr } = req.query
+    const { search, category, sort, limit: limitStr, page: pageStr } = req.query
 
     const filter: Record<string, unknown> = {}
 
@@ -52,13 +52,16 @@ export async function getProblems(req: AuthRequest, res: Response) {
     }
 
     const sortOrder = sort === "old" ? 1 : -1
-    const limit = Math.min(Math.abs(Number(limitStr) || 50), 100)
+    const limit = Math.min(Math.abs(Number(limitStr) || 12), 100)
+    const page = Math.max(Math.abs(Number(pageStr) || 1), 1)
+    const skip = (page - 1) * limit
 
-    const problems = await Problem.find(filter)
-      .sort({ createdAt: sortOrder })
-      .limit(limit)
+    const [problems, total] = await Promise.all([
+      Problem.find(filter).sort({ createdAt: sortOrder }).skip(skip).limit(limit),
+      Problem.countDocuments(filter),
+    ])
 
-    return res.json({ problems })
+    return res.json({ problems, total, page, totalPages: Math.ceil(total / limit) })
   } catch (error) {
     console.error("Get problems error:", error)
     return res.status(500).json({ error: "Failed to fetch problems" })
