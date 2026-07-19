@@ -1,6 +1,8 @@
 import { Response } from "express"
 import { Problem } from "../models/Problem"
 import { Comment } from "../models/Comment"
+import { Message } from "../models/Message"
+import { ChatSession } from "../models/ChatSession"
 import { AuthRequest } from "../types"
 
 export async function createProblem(req: AuthRequest, res: Response) {
@@ -183,14 +185,16 @@ export async function getOverviewStats(_req: AuthRequest, res: Response) {
     const totalPosts = await Problem.countDocuments()
     const solvedPosts = await Problem.countDocuments({ status: "resolved" })
     const totalComments = await Comment.countDocuments()
+    const totalMessages = await Message.countDocuments()
+    const totalAiChats = await ChatSession.countDocuments()
 
-    const dailyMap: Record<string, { posts: number; solved: number; comments: number }> = {}
+    const dailyMap: Record<string, { posts: number; solved: number; comments: number; messages: number; aiChats: number }> = {}
     const now = new Date()
     for (let i = 6; i >= 0; i--) {
       const d = new Date(now)
       d.setDate(d.getDate() - i)
       const key = d.toISOString().slice(0, 10)
-      dailyMap[key] = { posts: 0, solved: 0, comments: 0 }
+      dailyMap[key] = { posts: 0, solved: 0, comments: 0, messages: 0, aiChats: 0 }
     }
 
     const posts = await Problem.find({}, { createdAt: 1, updatedAt: 1, status: 1 })
@@ -209,9 +213,21 @@ export async function getOverviewStats(_req: AuthRequest, res: Response) {
       if (dailyMap[key]) dailyMap[key].comments++
     }
 
+    const allMessages = await Message.find({}, { createdAt: 1 })
+    for (const m of allMessages) {
+      const key = new Date(m.createdAt).toISOString().slice(0, 10)
+      if (dailyMap[key]) dailyMap[key].messages++
+    }
+
+    const allAiChats = await ChatSession.find({}, { createdAt: 1 })
+    for (const a of allAiChats) {
+      const key = new Date(a.createdAt).toISOString().slice(0, 10)
+      if (dailyMap[key]) dailyMap[key].aiChats++
+    }
+
     const daily = Object.entries(dailyMap).map(([date, val]) => ({ date, ...val }))
 
-    return res.json({ stats: { totalPosts, solvedPosts, totalComments, daily } })
+    return res.json({ stats: { totalPosts, solvedPosts, totalComments, totalMessages, totalAiChats, daily } })
   } catch (error) {
     console.error("Get overview stats error:", error)
     return res.status(500).json({ error: "Failed to get overview stats" })
